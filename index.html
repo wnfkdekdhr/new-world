@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>New World 꺼진 등불</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Gowun+Dodum&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #0e141c; --ink-2: rgba(14, 20, 28, 0.78); --gilt: #d8b46a; --gilt-dim: #9c8454;
+    --parch: #f1e7d0; --mist: #aab4be; --ember: #e58a4a;
+    --display: 'Nanum Myeongjo', 'Noto Serif KR', 'AppleMyungjo', serif;
+    --ui: 'Gowun Dodum', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  }
+  html, body { height: 100%; margin: 0; background: var(--ink); color: var(--parch); overflow: hidden; font-family: var(--ui); }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  [hidden] { display: none !important; }
+  .layer { position: fixed; inset: 0; pointer-events: none; }
+
+  /* loading */
+  #loading { position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 60%, #1b2632, var(--ink) 70%); display: grid; place-items: center; z-index: 50; transition: opacity 1.2s ease; }
+  #loading.done { opacity: 0; pointer-events: none; }
+  #loading .inner { width: min(360px, 80vw); text-align: center; display: grid; gap: 18px; }
+  #loading h1 { font: 800 clamp(28px, 6vw, 44px) var(--display); letter-spacing: 0.32em; margin: 0; color: var(--gilt); padding-left: 0.32em; }
+  .bar { height: 2px; background: rgba(216, 180, 106, 0.2); overflow: hidden; }
+  #loadbar { height: 100%; width: 0; background: var(--gilt); transition: width .3s; }
+  #loadmsg { font-size: 13px; color: var(--mist); letter-spacing: 0.08em; }
+
+  /* title */
+  #title { position: fixed; inset: 0; display: grid; align-content: center; justify-items: center; gap: 14px; padding-inline: 16px; z-index: 20;
+    background: linear-gradient(180deg, rgba(14,20,28,.2), rgba(14,20,28,.0) 40%, rgba(14,20,28,.75)); text-align: center; }
+  #title .eyebrow { font-size: 13px; letter-spacing: 0.4em; color: var(--mist); text-transform: uppercase; }
+  #title h1 { font: 800 clamp(44px, 11vw, 112px) var(--display); margin: 0; letter-spacing: 0.14em; line-height: 1; color: var(--parch);
+    text-shadow: 0 2px 30px rgba(0,0,0,.45); padding-left: 0.14em; }
+  #title h2 { font: 400 clamp(18px, 3vw, 26px) var(--display); margin: 0; color: var(--gilt); letter-spacing: 0.2em; padding-left: .2em; }
+  #title p { max-width: 34em; margin: 6px 0 12px; line-height: 1.7; color: #d9d2c2; text-wrap: balance; }
+  .btn { pointer-events: auto; font: 700 17px var(--display); letter-spacing: 0.24em; color: var(--ink); background: var(--gilt); border: 0; padding: 15px 40px 15px 46px; cursor: pointer;
+    clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%); transition: filter .2s, transform .2s; }
+  .btn:hover, .btn:focus-visible { filter: brightness(1.12); transform: translateY(-1px); outline: none; }
+  .keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; font-size: 13px; color: var(--mist); margin-top: 10px; }
+  kbd { font: 12px var(--ui); border: 1px solid rgba(170,180,190,.45); padding: 2px 7px; border-radius: 3px; color: var(--parch); margin-right: 4px; }
+
+  /* cinematic */
+  .lb { position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 15; transition: height .9s ease; }
+  .lb.top { top: 0 } .lb.bot { bottom: 0 }
+  body.cine .lb { height: 11vh; }
+  #narration { position: fixed; left: 50%; bottom: 14vh; transform: translateX(-50%); width: min(760px, calc(100% - 32px)); text-align: center; z-index: 16;
+    font: 400 clamp(17px, 2.4vw, 24px)/1.7 var(--display); color: var(--parch); text-shadow: 0 2px 12px #000; opacity: 0; }
+  body.cine #narration.show { animation: narr 5.4s ease forwards; }
+  @keyframes narr { 0% { opacity: 0; transform: translate(-50%, 8px); } 12%, 82% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+  #skip { position: fixed; right: 20px; bottom: calc(11vh + 10px); z-index: 16; font-size: 12px; color: var(--mist); display: none; letter-spacing: .1em; }
+  body.cine #skip { display: block; }
+
+  /* hud */
+  #quest { position: fixed; top: calc(18px + env(safe-area-inset-top, 0px)); left: 18px; width: min(300px, calc(100vw - 36px)); display: grid; gap: 6px; }
+  #quest .chap { font: 700 12px var(--ui); letter-spacing: 0.28em; color: var(--gilt); }
+  #quest .row { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
+  #quest .obj { font: 700 16px/1.45 var(--display); color: var(--parch); text-shadow: 0 1px 6px rgba(0,0,0,.8); }
+  #quest .count { font: 700 15px var(--display); color: var(--gilt); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .shardlist { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 3px; font-size: 13px; color: var(--mist); text-shadow: 0 1px 4px #000; }
+  .shardlist li::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border: 1px solid var(--gilt-dim); transform: rotate(45deg); }
+  .shardlist li.got { color: var(--parch); text-decoration: line-through rgba(216,180,106,.6); }
+  .shardlist li.got::before { background: var(--gilt); border-color: var(--gilt); }
+
+  #compass { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); width: min(460px, 44vw); height: 34px;
+    border-bottom: 1px solid rgba(216,180,106,.45); }
+  #compass::after { content: ''; position: absolute; left: 50%; bottom: -4px; width: 1px; height: 8px; background: var(--parch); }
+  #marks i { position: absolute; top: 8px; transform: translateX(-50%); font: normal 700 13px var(--display); color: var(--parch); text-shadow: 0 1px 4px #000; }
+  #marks em { position: absolute; top: 29px; transform: translateX(-50%); display: grid; justify-items: center; gap: 5px; font-style: normal; }
+  #marks em::before { content: ''; width: 9px; height: 9px; background: var(--gilt); transform: rotate(45deg); box-shadow: 0 0 10px var(--gilt); }
+  #marks em span { white-space: nowrap; font: 12px var(--ui); color: var(--gilt); text-shadow: 0 1px 4px #000; font-variant-numeric: tabular-nums; }
+
+  #prompt { position: fixed; left: 50%; bottom: 23%; transform: translateX(-50%); font: 700 15px var(--display); letter-spacing: .08em; padding: 9px 18px;
+    background: var(--ink-2); border: 1px solid rgba(216,180,106,.5); color: var(--parch); white-space: nowrap; }
+  #toast { position: fixed; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; opacity: 0; display: grid; gap: 6px; width: min(560px, calc(100% - 32px)); }
+  #toast b { font: 800 clamp(22px, 3.5vw, 32px) var(--display); color: var(--gilt); letter-spacing: .12em; text-shadow: 0 2px 16px rgba(0,0,0,.7); }
+  #toast span { font: 400 16px/1.6 var(--display); color: var(--parch); text-shadow: 0 1px 8px #000; }
+  #toast.show { animation: toast 4.2s ease forwards; }
+  @keyframes toast { 0% { opacity: 0; transform: translate(-50%, 10px); } 10%, 78% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+  #help { position: fixed; right: 18px; bottom: 16px; font-size: 12px; color: rgba(241,231,208,.6); text-align: right; line-height: 1.8; }
+
+  /* dialogue */
+  #dialogue { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(820px, calc(100% - 32px)); pointer-events: auto; cursor: pointer;
+    background: linear-gradient(180deg, rgba(14,20,28,.9), rgba(14,20,28,.96)); border-top: 1px solid var(--gilt); padding: 18px 26px 22px; display: grid; gap: 8px; z-index: 12; }
+  #dlgName { font: 800 15px var(--display); color: var(--gilt); letter-spacing: .2em; }
+  #dialogue[data-who="hero"] #dlgName { color: #a9c7e8; }
+  #dlgText { font: 400 clamp(16px, 2.2vw, 19px)/1.75 var(--display); color: var(--parch); min-height: 3.5em; }
+  #dialogue .next { position: absolute; right: 20px; bottom: 12px; font-size: 12px; color: var(--mist); letter-spacing: .1em; }
+  #choices { display: grid; gap: 8px; }
+  #choices button { pointer-events: auto; text-align: left; font: 700 16px var(--display); color: var(--parch); background: rgba(216,180,106,.08); border: 1px solid rgba(216,180,106,.35); padding: 11px 16px; cursor: pointer; }
+  #choices button:hover, #choices button:focus-visible { background: rgba(216,180,106,.22); outline: none; border-color: var(--gilt); }
+
+  /* chapter end */
+  #chapterEnd { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding-inline: 16px; background: rgba(8,10,14,.72); z-index: 30; animation: fade 1.6s ease; }
+  #chapterEnd .eyebrow { font-size: 13px; letter-spacing: .4em; color: var(--mist); }
+  #chapterEnd h2 { font: 800 clamp(30px, 6vw, 56px) var(--display); color: var(--gilt); margin: 0; letter-spacing: .12em; }
+  #chapterEnd p { max-width: 30em; line-height: 1.8; color: var(--parch); margin: 0 0 10px; }
+  @keyframes fade { from { opacity: 0 } }
+
+  /* touch */
+  #touch { display: none; }
+  @media (pointer: coarse) {
+    #touch { display: block; }
+    #help { display: none; }
+    #stick { position: fixed; width: 120px; height: 120px; border-radius: 50%; border: 1px solid rgba(241,231,208,.35); left: 30px; bottom: 60px; opacity: .5; }
+    #stick.on { opacity: 1; }
+    #knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(216,180,106,.6); }
+    .tbtn { position: fixed; pointer-events: auto; width: 64px; height: 64px; border-radius: 50%; border: 1px solid rgba(216,180,106,.6); background: rgba(14,20,28,.5); color: var(--parch); font: 700 16px var(--display); }
+    #btnAct { right: 28px; bottom: 120px; } #btnJump { right: 104px; bottom: 50px; }
+    #compass { width: 50vw; }
+  }
+  @media (max-width: 640px) {
+    #quest { top: calc(58px + env(safe-area-inset-top, 0px)); }
+    #compass { width: calc(100vw - 40px); }
+  }
+  @media (prefers-reduced-motion: reduce) { #toast.show, body.cine #narration.show { animation-duration: .01s; opacity: 1; } }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="loading"><div class="inner"><h1>NEW WORLD</h1><div class="bar"><div id="loadbar"></div></div><div id="loadmsg">아르델 계곡을 불러오는 중</div></div></div>
+
+<div id="title" hidden>
+  <div class="eyebrow">Chapter I</div>
+  <h1>NEW WORLD</h1>
+  <h2>꺼진 등불</h2>
+  <p>천 년을 지켜 온 대등불이 꺼지고, 잿빛 안개가 계곡으로 내려온다. 흩어진 빛의 파편을 모아 등불을 되살려라.</p>
+  <button class="btn" id="startBtn">모험 시작</button>
+  <div class="keys"><span><kbd>W A S D</kbd>이동</span><span><kbd>Shift</kbd>걷기</span><span><kbd>Space</kbd>점프</span><span><kbd>E</kbd>대화 · 줍기</span><span><kbd>마우스</kbd>시점</span></div>
+</div>
+
+<div class="lb top"></div><div class="lb bot"></div>
+<div id="narration"></div>
+<div id="skip">Space 건너뛰기</div>
+
+<div id="hud" class="layer" hidden>
+  <div id="quest"><div class="chap">제1장 · 꺼진 등불</div><div class="row"><div class="obj"></div><div class="count"></div></div><ul class="shardlist"></ul></div>
+  <div id="compass"><div id="marks"></div></div>
+  <div id="prompt" hidden></div>
+  <div id="toast"><b></b><span></span></div>
+  <div id="help">클릭하면 마우스로 시점 조작 · Esc 해제<br>휠로 카메라 거리 조절</div>
+  <div id="touch"><div id="stick"><div id="knob"></div></div><button class="tbtn" id="btnAct">E</button><button class="tbtn" id="btnJump">⤒</button></div>
+</div>
+
+<div id="dialogue" hidden><div id="dlgName"></div><div id="dlgText"></div><div id="choices" hidden></div><div class="next">Space · 클릭</div></div>
+
+<div id="chapterEnd" hidden>
+  <div class="eyebrow">제1장 완료</div>
+  <h2>등불이 다시 타오른다</h2>
+  <p>안개는 물러났지만, 북쪽 산맥 너머에서 무언가가 눈을 떴다. 제2장 「안개 너머로」에서 이야기가 이어진다.</p>
+  <button class="btn" id="againBtn">계속 둘러보기</button>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
