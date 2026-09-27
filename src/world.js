@@ -6,11 +6,23 @@ import { Terrain, WORLD_SIZE, GRID, CELL, PLACES, noise } from './terrain.js';
 import { mulberry32, smoothstep } from './noise.js';
 
 const loader = new GLTFLoader();
-// artifact hosting cannot serve .glb, so that build ships embedded glTF JSON instead
+// Decode embedded textures through <img> rather than fetch(blob:), which strict CSPs refuse
+loader.register((parser) => { parser.textureLoader = new THREE.TextureLoader(parser.options.manager); return { name: 'img_texture_loader' }; });
+// Artifact hosting cannot serve .glb and its CSP blocks fetching data: URIs, so that build
+// ships each GLB as base64 inside a .json file and decodes it here.
 export const MODEL_EXT = import.meta.env.VITE_MODEL_EXT || '.glb';
 const cache = new Map();
+async function fetchModel(url) {
+  if (MODEL_EXT !== '.json') return loader.loadAsync(url);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url} (${res.status})`);
+  const bin = atob((await res.json()).glb);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return loader.parseAsync(bytes.buffer, '');
+}
 export function loadGLB(url, onProgress) {
-  if (!cache.has(url)) cache.set(url, new Promise((res, rej) => loader.load(url, (g) => { onProgress?.(); res(g); }, undefined, rej)));
+  if (!cache.has(url)) cache.set(url, fetchModel(url).then((g) => { onProgress?.(); return g; }));
   return cache.get(url);
 }
 
@@ -39,7 +51,7 @@ export class World {
   _sky() {
     const sky = new Sky(); sky.scale.setScalar(4500);
     const u = sky.material.uniforms;
-    u.turbidity.value = 6; u.rayleigh.value = 1.6; u.mieCoefficient.value = 0.006; u.mieDirectionalG.value = 0.86;
+    u.turbidity.value = 5; u.rayleigh.value = 1.4; u.mieCoefficient.value = 0.0025; u.mieDirectionalG.value = 0.8;
     this.sky = sky;
     this.sun = new THREE.Vector3();
     this.setSun(13, 205);
